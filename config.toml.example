@@ -1,0 +1,12 @@
+port = 3800
+
+cool-down = 10
+
+[fore-session]
+    "user_id" = "session_id"
+
+[fore-chatid]
+    "user_id" = "chat_id"
+
+[fore-jwts]
+    "user_id" = "token"
