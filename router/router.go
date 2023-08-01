@@ -75,10 +75,28 @@ func Ask(c *gin.Context, req openai.CompletionRequest) {
 		panic(err)
 		return
 	}
+	timeout := time.Duration(10) * time.Second
+	ticker := time.NewTimer(timeout)
+	defer ticker.Stop()
 	content := ""
-	for m := range forefront.GetDataStream(resp) {
-		content += m
+	//for m := range forefront.GetDataStream(resp) {
+	//	content += m
+	//}
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("stream timeout")
+			goto END
+		case m := <-resp:
+			ticker.Reset(timeout)
+			if m != "[DONE]" {
+				content += m
+			} else {
+				goto END
+			}
+		}
 	}
+END:
 	choice := openai.Choice{
 		Index: 0,
 		Message: openai.Message{
@@ -146,29 +164,59 @@ func Stream(c *gin.Context, req openai.CompletionRequest) {
 	timeout := time.Duration(10) * time.Second
 	ticker := time.NewTimer(timeout)
 	defer ticker.Stop()
-	for m := range forefront.GetDataStream(resp) {
-		if m != "[DONE]" {
-			sse := GenSSEResponse(m, conversationID, nil, req.Model)
-			dataV, _ := json.Marshal(&sse)
-			_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
-			if err != nil {
-				log.Println(err)
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("stream timeout")
+			goto END
+		case m := <-resp:
+			ticker.Reset(timeout)
+			if m != "[DONE]" {
+				sse := GenSSEResponse(m, conversationID, nil, req.Model)
+				dataV, _ := json.Marshal(&sse)
+				_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
+				if err != nil {
+					log.Println(err)
+				}
+				flusher.Flush()
+			} else {
+				str := "stop"
+				sse := GenSSEResponse("", conversationID, &str, req.Model)
+				dataV, _ := json.Marshal(&sse)
+				_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
+				if err != nil {
+					log.Println(err)
+				}
+				flusher.Flush()
+				goto END
 			}
-			flusher.Flush()
-		} else {
-			str := "stop"
-			sse := GenSSEResponse("", conversationID, &str, req.Model)
-			dataV, _ := json.Marshal(&sse)
-			_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
-			if err != nil {
-				log.Println(err)
-			}
-			flusher.Flush()
-			break
 		}
 	}
+END:
+	//for m := range forefront.GetDataStream(resp) {
+	//
+	//	if m != "[DONE]" {
+	//		sse := GenSSEResponse(m, conversationID, nil, req.Model)
+	//		dataV, _ := json.Marshal(&sse)
+	//		_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
+	//		if err != nil {
+	//			log.Println(err)
+	//		}
+	//		flusher.Flush()
+	//	} else {
+	//		str := "stop"
+	//		sse := GenSSEResponse("", conversationID, &str, req.Model)
+	//		dataV, _ := json.Marshal(&sse)
+	//		_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
+	//		if err != nil {
+	//			log.Println(err)
+	//		}
+	//		flusher.Flush()
+	//		break
+	//	}
+	//}
 	_, err = io.WriteString(w, "data: [DONE]\n\n")
-
+	flusher.Flush()
 	log.Println("stream closed")
 }
 

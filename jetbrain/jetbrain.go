@@ -137,7 +137,7 @@ func DealConversation(response *fhttp.Response, textChan chan string) {
 	}
 	log.Println("streaming finished")
 	textChan <- "data: [DONE]\n\n"
-	//<-textChan
+	close(textChan)
 }
 
 func GenSSEResponse(text string, conversationID string, finishReason *string) openai.CompletionSSEResponse {
