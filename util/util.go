@@ -27,7 +27,7 @@ func RandStringRunes2(n int) string {
 func InitTlsClient() []tls_client.HttpClientOption {
 	jar := tls_client.NewCookieJar()
 	options := []tls_client.HttpClientOption{
-		tls_client.WithTimeoutSeconds(30),
+		tls_client.WithTimeoutSeconds(500),
 		tls_client.WithClientProfile(tls_client.Okhttp4Android13),
 		// tls_client.WithNotFollowRedirects(),
 		tls_client.WithCookieJar(jar), // create cookieJar instance and pass it as argument

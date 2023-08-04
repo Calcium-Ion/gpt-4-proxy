@@ -14,14 +14,17 @@ import (
 	"gpt-4-proxy/util"
 	"io"
 	"log"
+	"math/rand"
 	"strings"
+	"time"
 )
 
-type ForeFrontClient struct {
-	UserId      string `json:"user_id"`
-	SessionId   string `json:"session_id"`
-	JWT         string `json:"jwt"`
-	Lock        bool   `json:"lock"`
+type Client struct {
+	UserId    string `json:"user_id"`
+	SessionId string `json:"session_id"`
+	JWT       string `json:"jwt"`
+	//Lock        bool   `json:"lock"`
+	ChatCount   int    `json:"chat_count"`
 	WorkSpaceId string `json:"work_space_id"`
 }
 
@@ -32,34 +35,41 @@ type Message struct {
 	Seq     int    `json:"seq"`
 }
 
-var ForeFrontClientList []ForeFrontClient
+var ClientList []Client
 
 func InitForeFrontClients() {
-	ForeFrontClientList = make([]ForeFrontClient, 0)
+	ClientList = make([]Client, 0)
 	for userId, sessionId := range conf.Conf.ForeSession {
-		client := ForeFrontClient{
+		client := Client{
 			UserId:      userId,
 			SessionId:   sessionId,
 			JWT:         conf.Conf.ForeJwt[userId],
 			WorkSpaceId: conf.Conf.ForeChatId[userId],
-			Lock:        false,
+			ChatCount:   0,
 		}
-		ForeFrontClientList = append(ForeFrontClientList, client)
+		ClientList = append(ClientList, client)
 	}
 }
 
-func GetForeClient() *ForeFrontClient {
-	for _, client := range ForeFrontClientList {
-		if !client.Lock {
-			client.Lock = true
+func GetForeClient() *Client {
+	rand.Seed(time.Now().UnixNano())
+	index := rand.Intn(len(ClientList))
+	client := ClientList[index]
+	if client.ChatCount < 2 {
+		client.ChatCount++
+		return &client
+	}
+	for _, client := range ClientList {
+		if client.ChatCount < 2 {
+			client.ChatCount++
 			return &client
 		}
 	}
 	return nil
 }
 
-func ReleaseClient(client ForeFrontClient) {
-	client.Lock = false
+func ReleaseClient(client Client) {
+	client.ChatCount--
 }
 
 func GetContentToSend(messages []openai.Message) string {
@@ -80,7 +90,7 @@ func GetContentToSend(messages []openai.Message) string {
 	return content
 }
 
-func Stream(messages []openai.Message, client ForeFrontClient, model string) (<-chan string, int, error) {
+func Stream(messages []openai.Message, client Client, model string) (<-chan string, int, error) {
 	var useModel string
 	if strings.HasPrefix(model, "gpt-4") {
 		useModel = "gpt-4"
@@ -166,16 +176,18 @@ func StreamConversation(response *fhttp.Response, textChan chan string, model st
 			}
 
 		}
-		//log.Println(line)
-		//if len(line) < 8 || line == "" {
+		//if len(line) > 1 {
+		//	log.Println(line)
+		//}
+		//if len(line) < 1 || line == "" {
 		//	continue
 		//}
 		if strings.HasPrefix(line, "event: end") {
 			break
 		}
-		if strings.HasPrefix(line, "event: ") {
-			continue
-		}
+		//if strings.HasPrefix(line, "event: ") {
+		//	continue
+		//}
 		if strings.HasPrefix(line, "data: ") {
 			if strings.HasPrefix(line, "data: {") {
 				jsonMap := make(map[string]string)

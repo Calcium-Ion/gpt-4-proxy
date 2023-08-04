@@ -52,17 +52,20 @@ func Setup(engine *gin.Engine) {
 
 func Ask(c *gin.Context, req openai.CompletionRequest) {
 	client := forefront.GetForeClient()
-	defer forefront.ReleaseClient(*client)
 	if client == nil {
 		openAIError := openai.OpenAIError{
 			Type:    "openai_api_error",
-			Message: "The server is overload",
+			Message: "当前渠道负载已满",
 			Code:    "do_request_failed",
 		}
 		c.JSON(500, gin.H{
 			"error": openAIError,
 		})
+		return
 	}
+	log.Println("ask using " + client.UserId)
+	defer forefront.ReleaseClient(*client)
+
 	tkm, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
 		err = fmt.Errorf("getEncoding: %v", err)
@@ -75,7 +78,7 @@ func Ask(c *gin.Context, req openai.CompletionRequest) {
 		panic(err)
 		return
 	}
-	timeout := time.Duration(10) * time.Second
+	timeout := time.Duration(20) * time.Second
 	ticker := time.NewTimer(timeout)
 	defer ticker.Stop()
 	content := ""
@@ -123,7 +126,6 @@ END:
 }
 
 func Stream(c *gin.Context, req openai.CompletionRequest) {
-	log.Println("streaming started")
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)
@@ -138,17 +140,20 @@ func Stream(c *gin.Context, req openai.CompletionRequest) {
 		}
 	}()
 	client := forefront.GetForeClient()
-	defer forefront.ReleaseClient(*client)
 	if client == nil {
 		openAIError := openai.OpenAIError{
 			Type:    "openai_api_error",
-			Message: "The server is overload",
+			Message: "当前渠道负载已满",
 			Code:    "do_request_failed",
 		}
 		c.JSON(500, gin.H{
 			"error": openAIError,
 		})
+		return
 	}
+	defer forefront.ReleaseClient(*client)
+	log.Println("streaming using " + client.UserId)
+
 	resp, _, err := forefront.Stream(req.Messages, *client, req.Model)
 	if err != nil {
 		panic(err)
@@ -161,7 +166,7 @@ func Stream(c *gin.Context, req openai.CompletionRequest) {
 
 	w := c.Writer
 	flusher, _ := w.(http.Flusher)
-	timeout := time.Duration(10) * time.Second
+	timeout := time.Duration(20) * time.Second
 	ticker := time.NewTimer(timeout)
 	defer ticker.Stop()
 	for {
