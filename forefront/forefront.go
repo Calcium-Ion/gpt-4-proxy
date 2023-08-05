@@ -74,17 +74,21 @@ func ReleaseClient(client Client) {
 
 func GetContentToSend(messages []openai.Message) string {
 	leadingMap := map[string]string{
-		"system":    "YouShouldKnow",
-		"user":      "Me",
-		"assistant": "You",
+		"system":    "Instructions",
+		"user":      "User",
+		"assistant": "Assistant",
 		"function":  "Information",
 	}
 	content := ""
 
-	for _, message := range messages {
-		content += "||>" + leadingMap[message.Role] + ":\n" + message.Content + "\n"
+	if len(messages) == 1 {
+		content += messages[0].Content
+	} else {
+		for _, message := range messages {
+			content += "||>" + leadingMap[message.Role] + ":\n" + message.Content + "\n"
+		}
+		content += "||>Assistant:\n"
 	}
-	content += "||>You:\n"
 
 	//util.Logger.Debug("Generated content to send: " + content)
 	return content
