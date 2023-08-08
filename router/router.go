@@ -108,12 +108,16 @@ END:
 		},
 		FinishReason: "stop",
 	}
+	model := req.Model
+	if model == "gpt-4" {
+		model = "gpt-4-0613"
+	}
 	completionTokens := tkm.Encode(content, nil, nil)
 	sse := openai.CompletionResponse{
 		Choices: []openai.Choice{choice},
 		Created: time.Now().Unix(),
 		ID:      conversationID,
-		Model:   req.Model,
+		Model:   model,
 		Object:  "chat.completion",
 		Usage: openai.Usage{
 			PromptTokens:     token,
@@ -198,28 +202,6 @@ func Stream(c *gin.Context, req openai.CompletionRequest) {
 		}
 	}
 END:
-	//for m := range forefront.GetDataStream(resp) {
-	//
-	//	if m != "[DONE]" {
-	//		sse := GenSSEResponse(m, conversationID, nil, req.Model)
-	//		dataV, _ := json.Marshal(&sse)
-	//		_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
-	//		if err != nil {
-	//			log.Println(err)
-	//		}
-	//		flusher.Flush()
-	//	} else {
-	//		str := "stop"
-	//		sse := GenSSEResponse("", conversationID, &str, req.Model)
-	//		dataV, _ := json.Marshal(&sse)
-	//		_, err := io.WriteString(w, "data: "+string(dataV)+"\n\n")
-	//		if err != nil {
-	//			log.Println(err)
-	//		}
-	//		flusher.Flush()
-	//		break
-	//	}
-	//}
 	_, err = io.WriteString(w, "data: [DONE]\n\n")
 	flusher.Flush()
 	log.Println("stream closed")
@@ -230,6 +212,9 @@ func GenSSEResponse(text string, conversationID string, finishReason *string, mo
 	if finishReason == nil {
 		delta["content"] = text
 		delta["role"] = "assistant"
+	}
+	if model == "gpt-4" {
+		model = "gpt-4-0613"
 	}
 	sse := openai.CompletionSSEResponse{
 		Choices: []openai.SSEChoice{{

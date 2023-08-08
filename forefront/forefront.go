@@ -100,6 +100,14 @@ func Stream(messages []openai.Message, client Client, model string) (<-chan stri
 		useModel = "gpt-4"
 	} else if strings.HasPrefix(model, "gpt-3") {
 		useModel = "gpt-3.5-turbo"
+	} else if strings.HasPrefix(model, "claude") {
+		if strings.HasPrefix(model, "claude-2") {
+			useModel = "claude"
+		} else {
+			useModel = "claude-instant"
+		}
+	} else {
+		return nil, 0, fmt.Errorf("unsupported model: %s", model)
 	}
 	tkm, err := tiktoken.EncodingForModel("gpt-4")
 	if err != nil {
@@ -131,6 +139,11 @@ func Stream(messages []openai.Message, client Client, model string) (<-chan stri
 	}
 	text := GetContentToSend(messages)
 	token := tkm.Encode(text, nil, nil)
+	if !strings.HasPrefix(model, "gpt-4-32k") && !strings.HasPrefix(model, "claude") {
+		if len(token) > 8192 {
+			return nil, 0, fmt.Errorf("out of token limit, max 8192 tokens")
+		}
+	}
 	jsonMap := map[string]interface{}{
 		"text":           text,
 		"id":             util.RandStringRunes2(9),
@@ -172,6 +185,7 @@ func Stream(messages []openai.Message, client Client, model string) (<-chan stri
 func StreamConversation(response *fhttp.Response, textChan chan string, model string) {
 	defer response.Body.Close()
 	reader := bufio.NewReader(response.Body)
+	claudeLastResponse := ""
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -183,9 +197,9 @@ func StreamConversation(response *fhttp.Response, textChan chan string, model st
 		//if len(line) > 1 {
 		//	log.Println(line)
 		//}
-		//if len(line) < 1 || line == "" {
-		//	continue
-		//}
+		if len(line) < 1 || line == "" {
+			continue
+		}
 		if strings.HasPrefix(line, "event: end") {
 			break
 		}
@@ -202,8 +216,21 @@ func StreamConversation(response *fhttp.Response, textChan chan string, model st
 					log.Println(err)
 					continue
 				}
-				fmt.Printf(jsonMap["delta"])
-				textChan <- jsonMap["delta"]
+				responseStr := ""
+				if strings.HasPrefix(model, "claude") {
+					temp := jsonMap["text"]
+					if len(temp) < 4 && strings.Contains(temp, "�") {
+						continue
+					} else {
+						temp = strings.ReplaceAll(temp, "��", "�")
+					}
+					responseStr = temp[len(claudeLastResponse):]
+					claudeLastResponse = temp
+				} else {
+					responseStr = jsonMap["delta"]
+				}
+				fmt.Printf(responseStr)
+				textChan <- responseStr
 			} else {
 				break
 			}
