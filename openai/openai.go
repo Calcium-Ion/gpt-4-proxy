@@ -19,6 +19,7 @@ type CompletionRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
 	Stream   bool      `json:"stream"`
+	N        int       `json:"n"`
 }
 
 type CompletionResponse struct {

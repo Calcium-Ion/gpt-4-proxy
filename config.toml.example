@@ -2,6 +2,8 @@ port = 3800
 
 cool-down = 10
 
+max-threads = 5
+
 [fore-session]
     "user_id" = "session_id"
 

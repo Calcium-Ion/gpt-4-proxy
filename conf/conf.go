@@ -9,10 +9,12 @@ type ConfigStruct struct {
 	Port          int               `toml:"port"`
 	CoolDown      int               `toml:"cool-down"`
 	AutoReload    int               `toml:"auto-reload"`
+	MaxThreads    int               `toml:"max-threads"`
 	JetBrainToken string            `toml:"jetbrain-token"`
 	ForeSession   map[string]string `toml:"fore-session"`
 	ForeJwt       map[string]string `toml:"fore-jwts"`
 	ForeChatId    map[string]string `toml:"fore-chatid"`
+	ForeSign      map[string]string `toml:"fore-sign"`
 }
 
 var Conf ConfigStruct
